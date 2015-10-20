@@ -1,0 +1,24 @@
+-input-mesh
+qin-mesh.msh
+-output-mesh
+rbf-qin.msh
+-negative-jacobian-file
+negative_jac.dat
+-rotation-angle
+113
+-coordinates-of-centre-of-rotation
+0.0 0.0
+-number-of-boundary-markers-whose-faces-have-to-be-rotated
+1
+-boundary-markers-of-faces-to-be-rotated
+1
+support-radius
+17.0
+-number-of-rbf-steps
+1
+-tolerance
+1e-6
+-maximum-number-of-iterations-for-CG
+10000
+
+feflo.domn.wing.coarse
