@@ -35,13 +35,18 @@ TODO: (Not really needed) Make a Vector class, maybe as a sub-class of Matrix
 #endif
 
 #ifdef _OPENMP
-#ifndef OMP_H
-#include <omp.h>
-#define nthreads_m 8
-#endif
+	#ifndef OMP_H
+		#include <omp.h>
+		#define nthreads_m 8
+	#endif
 #endif
 
 #define __AMATRIX2_H
+
+// tolerance to check if something is zero
+#ifndef ZERO_TOL
+	#define ZERO_TOL 1e-14
+#endif
 
 //using namespace std;
 

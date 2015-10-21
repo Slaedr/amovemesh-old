@@ -1,7 +1,7 @@
 -input-mesh
-qin-mesh.msh
+../../input/qin-mesh.msh
 -output-mesh
-dgrbf_r-qin.msh
+../../output/DG-RBF-move/dgrbf_r-qin.msh
 -output-dg
 dgrbf_r-dg-qin.msh
 -negative-jacobian-file

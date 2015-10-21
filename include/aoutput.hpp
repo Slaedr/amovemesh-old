@@ -245,6 +245,74 @@ void writeScalarsVectorToVtu_CellData(string fname, UTriMesh m, Matrix<double> x
 	cout << "Vtu file written.\n";
 }
 
+void writeScalarsVectorToVtu_CellData(string fname, UMesh2d& m, Matrix<double> x, string scaname[], Matrix<double> y, string vecname)
+{
+	//TODO: Make this function dimension-independent.
+	//TODO: Add error-handling code to ignore the vector part if matrix y is 0x0.
+	cout << "aoutput: Writing vtu output...\n";
+	ofstream out(fname);
+
+	const int celltype = 5;
+
+	int nscalars = x.cols();
+
+	out << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+	out << "<UnstructuredGrid>\n";
+	out << "\t<Piece NumberOfPoints=\"" << m.gnpoin() << "\" NumberOfCells=\"" << m.gnelem() << "\">\n";
+
+	//enter point scalar data
+	out << "\t\t<CellData Scalars=\""<<scaname[0]<< "\" Vectors=\"" << vecname << "\">\n";
+
+	//cout << "aoutput: Writing scalars..\n";
+	for(int in = 0; in < nscalars; in++)
+	{
+		out << "\t\t\t<DataArray type=\"Float64\" Name=\"" << scaname[in] << "\" Format=\"ascii\">\n";
+		for(int i = 0; i < m.gnelem(); i++)
+			out << "\t\t\t\t" << x(i,in) << '\n';
+		out << "\t\t\t</DataArray>\n";
+	}
+	//cout << "aoutput: Scalars written.\n";
+
+	//enter vector point data
+	out << "\t\t\t<DataArray type=\"Float64\" Name=\"" << vecname << "\" NumberOfComponents=\"3\" Format=\"ascii\">\n";
+	for(int i = 0; i < m.gnelem(); i++)
+		out << "\t\t\t\t" << y(i,0) << " " << y(i,1) << " " << 0.0 << '\n';
+	out << "\t\t\t</DataArray>\n";
+	out << "\t\t</CellData>\n";
+
+	//enter points
+	out << "\t\t<Points>\n";
+	out << "\t\t<DataArray type=\"Float64\" NumberOfComponents=\"3\" Format=\"ascii\">\n";
+	for(int i = 0; i < m.gnpoin(); i++)
+		out << "\t\t\t" << m.gcoords(i,0) << " " << m.gcoords(i,1) << " " << 0.0 << '\n';
+	out << "\t\t</DataArray>\n";
+	out << "\t\t</Points>\n";
+
+	//enter cells
+	out << "\t\t<Cells>\n";
+	out << "\t\t\t<DataArray type=\"UInt32\" Name=\"connectivity\" Format=\"ascii\">\n";
+	for(int i = 0; i < m.gnelem(); i++)
+		out << "\t\t\t\t" << m.ginpoel(i,0) << " " << m.ginpoel(i,1) << " " << m.ginpoel(i,2) << '\n';
+	out << "\t\t\t</DataArray>\n";
+	out << "\t\t\t<DataArray type=\"UInt32\" Name=\"offsets\" Format=\"ascii\">\n";
+	for(int i = 0; i < m.gnelem(); i++)
+		out << "\t\t\t\t" << 3*(i+1) << '\n';
+	out << "\t\t\t</DataArray>\n";
+	out << "\t\t\t<DataArray type=\"Int32\" Name=\"types\" Format=\"ascii\">\n";
+	for(int i = 0; i < m.gnelem(); i++)
+		out << "\t\t\t\t" << celltype << '\n';
+	out << "\t\t\t</DataArray>\n";
+	out << "\t\t</Cells>\n";
+
+	//finish upper
+	out << "\t</Piece>\n";
+	out << "</UnstructuredGrid>\n";
+	out << "</VTKFile>";
+	out.close();
+	cout << "Vtu file written.\n";
+}
+
+
 void writeScalarsVectorToVtu(string fname, UTriMesh m, Matrix<double> x, string scaname[], Matrix<double> y, string vecname)
 {
 	cout << "aoutput: Writing vtu output...\n";

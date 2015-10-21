@@ -1,6 +1,15 @@
-// Data structure and setup for 2D unstructured mesh.
-// Aditya Kashi
-// Aug 12, 2015
+/** Data structure and setup for 2D unstructured mesh.
+	Aditya Kashi
+	Aug 12, 2015
+
+	References:
+	===========
+	For mesh quality metrics:
+	Patrick M. Knupp, "Algebraic mesh quality metrics for unstructured initial meshes", Finite Elements in Analysis and Design, vol. 39, pp 217-241, 2003.
+
+	Changelog:
+	2015-10-21: Adding computation of mesh-quality metrics for quadrilateral elements
+*/
 
 #ifndef _GLIBCXX_IOSTREAM
 #include <iostream>
@@ -42,7 +51,7 @@ namespace acfd {
 
 const double PI = 3.14159265358979323846;
 
-/** Class UMesh2d is a general mesh class for unstructured mesh (with 1 kind of element throughout - hybrid mesh is NOT supporte) */
+/** Class UMesh2d is a general mesh class for unstructured mesh (with 1 kind of element throughout - hybrid mesh is NOT supported) */
 class UMesh2d
 {
 private:
@@ -52,7 +61,7 @@ private:
 	int ndim;		//< Dimension of the mesh
 	int nnode;		//< number of nodes to an element
 	int nfael;		//< number of faces to an element (equal to number of edges to an element in 2D)
-	int nnofa;		//< number of node in a face -- needs to be generalized in case of general grids
+	int nnofa;		//< number of node in a face -- different values need to be stored for each element in case of general grids
 	int naface;		//< total number of (internal and boundary) faces
 	int nbface;		//< number of boundary faces as calculated by compute_face_data(), as opposed to nface which is read from file
 	int nbpoin;		//< number of boundary points
@@ -88,9 +97,25 @@ private:
 	bool alloc_jacobians;
 	Matrix<double> jacobians;		//< Contains jacobians of each (linear) element
 
+	Matrix<double> alpha;
+	/**< Contains Knupp's node-local areas for each node of each element. If the elements are triangles, it contains just 1 value for each element.
+	If elements are quads, there are 4 values for each element, one associated with each node. */
+
+	Matrix<double>* lambda;
+	/**< Contains Knupp's 3 coeffs of metric tensor for each node of each element. In case of triangles, it just contains 3 coeffs for each element.
+	In case of quads, we need to store 3 coeffs for each node of each element. */
+
+	int nmtens;				//< number of metric tensors required for each element - 1 for triangles and 4 for quads.
+	int neleminlambda;		//< number of coeffs in lambda per element per node.
+	bool alloc_lambda;		//< Contains true if alpha and lambda have been allocated.
+
 public:
 
-	UMesh2d() { alloc_jacobians = false; }
+	UMesh2d() { 
+		alloc_jacobians = false;
+		alloc_lambda = false;
+		neleminlambda = 3;
+	}
 
 	UMesh2d(const UMesh2d& other)
 	{
@@ -163,6 +188,12 @@ public:
 		alloc_jacobians = other.alloc_jacobians;
 		jacobians = other.jacobians;
 		return *this;
+	}
+
+	~UMesh2d()
+	{
+		if(alloc_lambda)
+			delete [] lambda;
 	}
 
 	double gcoords(int pointno, int dim) const
@@ -336,6 +367,9 @@ public:
 
 		vol_regions.setup(nelem, ndtag);
 		vol_regions.zeros();
+
+		if (nnode == 3) nmtens = 1;
+		else if(nnode == 4) nmtens = 4;
 	}
 
 	/// Reads mesh from Gmsh 2 format file
@@ -504,6 +538,9 @@ public:
 				vol_regions(i,j) = elms(i+nface,j+nnode);
 		}
 		infile.close();
+
+		if (nnode == 3) nmtens = 1;
+		else if(nnode == 4) nmtens = 4;
 	}
 
 	void readYibinMesh(string meshn)
@@ -1509,6 +1546,123 @@ public:
 			cout << "UMesh2d: convertLinearToQuadratic(): Done." << endl;
 			return q;
 		}
+	}
+
+	// ------------------------------------------- Mesh quality ----------------------------------------------------
+
+	/** Computes the 'jacobian' matrices and metric tensors used to compute quality metrics.
+	If the mesh is triangular, nmtens is 1.
+	If the mesh is made up of quadrilaterals, nmtens is 4, and we calculate alpha and lambdas for each node.
+	lambda[*](*,0) is Knupp's lambda_11, lambda[*](*,1) is Knupp's lambda_12 and lambda[*](*,2) is Knupp's lambda_22.
+	*/
+	void compute_metric_quantities()
+	{
+		if(!alloc_lambda) {
+			alpha.setup(nelem,nmtens);
+			lambda = new Matrix<double>[nelem];
+			for(int i = 0; i < nelem; i++)
+				lambda[i].setup(nmtens,neleminlambda);
+			alloc_lambda = true;
+		}
+
+		// populate A^T*A vector for each element
+		for(int ielem = 0; ielem < nelem; ielem++)
+		{
+			if(nmtens == 1)
+			{
+				lambda[ielem](0,0) = (coords(inpoel(ielem,1),0) - coords(inpoel(ielem,0),0)) * (coords(inpoel(ielem,1),0) - coords(inpoel(ielem,0),0)) 
+					+ (coords(inpoel(ielem,1),1) - coords(inpoel(ielem,0),1)) * (coords(inpoel(ielem,1),1) - coords(inpoel(ielem,0),1));
+				lambda[ielem](0,1) = (coords(inpoel(ielem,1),0) - coords(inpoel(ielem,0),0)) * (coords(inpoel(ielem,2),0) - coords(inpoel(ielem,0),0))
+					+ (coords(inpoel(ielem,1),1) - coords(inpoel(ielem,0),1)) * (coords(inpoel(ielem,2),1) - coords(inpoel(ielem,0),1));
+				lambda[ielem](0,2) = (coords(inpoel(ielem,2),0) - coords(inpoel(ielem,0),0)) * (coords(inpoel(ielem,2),0) - coords(inpoel(ielem,0),0)) 
+					+ (coords(inpoel(ielem,2),1) - coords(inpoel(ielem,0),1)) * (coords(inpoel(ielem,2),1) - coords(inpoel(ielem,0),1));
+
+				alpha(ielem,0) = (coords(inpoel(ielem,1),0)-coords(inpoel(ielem,0),0))*(coords(inpoel(ielem,2),1)-coords(inpoel(ielem,0),1))
+					- (coords(inpoel(ielem,2),0)-coords(inpoel(ielem,0),0))*(coords(inpoel(ielem,1),1)-coords(inpoel(ielem,0),1));
+			}
+
+			else if(nmtens == 4)
+				for(int k = 0; k < nmtens; k++)
+				{
+					lambda[ielem](k,0) = (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) 
+						+ (coords(inpoel(ielem,(k+1)%nnode),1) - coords(inpoel(ielem,k),1)) * (coords(inpoel(ielem,(k+1)%nnode),1) - coords(inpoel(ielem,k),1));
+					lambda[ielem](k,1) = (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) 
+						+ (coords(inpoel(ielem,(k+1)%nnode),1) - coords(inpoel(ielem,k),1)) * (coords(inpoel(ielem,(k+3)%nnode),1) - coords(inpoel(ielem,k),1));
+					lambda[ielem](k,3) = (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) 
+						+ (coords(inpoel(ielem,(k+3)%nnode),1) - coords(inpoel(ielem,k),1)) * (coords(inpoel(ielem,(k+3)%nnode),1) - coords(inpoel(ielem,k),1));
+
+					alpha(ielem,k) = (coords(inpoel(ielem,(k+1)%nnode),0)-coords(inpoel(ielem,k),0))*(coords(inpoel(ielem,(k+3)%nnode),1)-coords(inpoel(ielem,k),1))
+						- (coords(inpoel(ielem,(k+3)%nnode),0)-coords(inpoel(ielem,k),0))*(coords(inpoel(ielem,(k+1)%nnode),1)-coords(inpoel(ielem,k),1));
+				}
+		}
+	}
+
+	/** Computes skew metric of each element of a quad mesh and stores it in skew. */
+	void linearmetric_skew(Matrix<double>* skew)
+	{
+		if(!alloc_lambda) {
+			cout << "UMesh2d: linearmetric_skew(): ! Metric quantities not computed!" << endl;
+			return;
+		}
+		if(nnode == 3) {
+			cout << "UMesh2d: linearmetric_skew(): ! No skew metric for triangles!" << endl;
+			return;
+		}
+
+		for(int ielem = 0; ielem < nelem; ielem++)
+		{
+			double denom = 0;
+			for(int k = 0; k < nnode; k++)
+				denom += sqrt(lambda[ielem](k,0)*lambda[ielem](k,2))/alpha(ielem,k);
+			(*skew)(ielem) = 4.0/denom;
+		}
+	}
+
+	/** Computes size metric of each element of a mesh with respect to reference area w, and stores it in size. */
+	void linearmetric_size(double w, Matrix<double>* size)
+	{
+		if(nnode == 4)
+		{
+			for(int ielem = 0; ielem < nelem; ielem++)
+			{
+				double tau = (alpha(ielem,0) + alpha(ielem,2))/(2.0*w);
+				if(tau < ZERO_TOL) cout << "UMesh2d: linearmetric_size(): ! tau is nearly zero!!" << endl;
+				double invtau = 1.0/tau;
+				if(tau >= invtau) (*size)(ielem) = invtau;
+				else (*size)(ielem) = tau;
+			}
+		}
+		else if(nnode == 3)
+		{
+			for(int ielem = 0; ielem < nelem; ielem++)
+			{
+				double tau = alpha(ielem,0)/w;
+				if(tau < ZERO_TOL) cout << "UMesh2d: linearmetric_size(): ! tau is nearly zero!!" << endl;
+				double invtau = 1.0/tau;
+				if(tau >= invtau) (*size)(ielem) = invtau;
+				else (*size)(ielem) = tau;
+			}
+		}
+	}
+
+	/** Computes the skew-size metric, which is the product of the skew and size metrics. */
+	void linearmetric_skewsize(double w, Matrix<double>* ss)
+	{
+		Matrix<double> size = *ss;
+		if(!alloc_lambda) {
+			cout << "UMesh2d: linearmetric_skew(): ! Metric quantities not computed!" << endl;
+			return;
+		}
+		if(nnode == 3) {
+			cout << "UMesh2d: linearmetric_skew(): ! No skew metric for triangles!" << endl;
+			return;
+		}
+
+		linearmetric_size(w,&size);
+		linearmetric_skew(ss);
+
+		for(int i = 0; i < nelem; i++)
+			(*ss)(i) *= size(i);
 	}
 };
 
