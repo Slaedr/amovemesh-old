@@ -14,6 +14,8 @@
 #include <alinalg.hpp>
 #endif
 
+#define __ARBF_H 1
+
 using namespace std;
 using namespace amat;
 
@@ -208,10 +210,6 @@ public:
 				}
 			}
 		}
-
-		/*ofstream outf("A.dat");
-		A->fprint(outf);
-		outf.close();*/
 
 		/*cout << "RBFmove:  assembleLHS(): assembling P_b" << endl;
 		// set P_b and P_b transpose

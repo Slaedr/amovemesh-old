@@ -1,9 +1,15 @@
+/** A collection of subroutines to write mesh data to various kinds of output formats.*/
+
 #ifndef __AMATRIX2_H
-#include "amatrix2.hpp"
+#include <amatrix2.hpp>
 #endif
 
 #ifndef __AMESH2D_H
 #include "amesh2.hpp"
+#endif
+
+#ifndef __AMESH2DGENERAL_H
+#include <amesh2d.hpp>
 #endif
 
 #ifndef __AMESH2DCURVED_H
@@ -23,6 +29,10 @@
 using namespace std;
 using namespace amat;
 using namespace acfd;
+
+void writeScalarsVectorToVtu_CellData(string fname, const UMesh2d& m, const Matrix<double>& x, string scaname[], const Matrix<double>& y, string vecname);
+
+// -------------- Implemetations -----------------------
 
 void prepareVtk (ofstream& out, UTriMesh m, string title)
 {
@@ -180,7 +190,7 @@ void writeScalarVectorToVtu(string fname, UTriMesh m, Matrix<double> x, string s
 	cout << "Vtu file written.\n";
 }
 
-void writeScalarsVectorToVtu_CellData(string fname, UTriMesh m, Matrix<double> x, string scaname[], Matrix<double> y, string vecname)
+void writeScalarsVectorToVtu_CellData(string fname, UTriMesh& m, Matrix<double>& x, string scaname[], Matrix<double>& y, string vecname)
 {
 	cout << "aoutput: Writing vtu output...\n";
 	ofstream out(fname);
@@ -245,14 +255,23 @@ void writeScalarsVectorToVtu_CellData(string fname, UTriMesh m, Matrix<double> x
 	cout << "Vtu file written.\n";
 }
 
-void writeScalarsVectorToVtu_CellData(string fname, UMesh2d& m, Matrix<double> x, string scaname[], Matrix<double> y, string vecname)
+/** Writes multiple scalar data sets and one vector data set, all cell-centered data, to a file in VTU format.
+	If either x or y is a 0x0 matrix, it is ignored.
+*/
+void writeScalarsVectorToVtu_CellData(string fname, const UMesh2d& m, const Matrix<double>& x, string scaname[], const Matrix<double>& y, string vecname)
 {
-	//TODO: Make this function dimension-independent.
-	//TODO: Add error-handling code to ignore the vector part if matrix y is 0x0.
+	int elemcode = 5;
+	if(m.gnnode() == 4)
+		elemcode = 9;
+	else if(m.gnnode() == 6)
+		elemcode = 22;
+	else if(m.gnnode() == 8)
+		elemcode = 23;
+	else if(m.gnnode() == 9)
+		elemcode = 28;
+	
 	cout << "aoutput: Writing vtu output...\n";
 	ofstream out(fname);
-
-	const int celltype = 5;
 
 	int nscalars = x.cols();
 
@@ -260,47 +279,79 @@ void writeScalarsVectorToVtu_CellData(string fname, UMesh2d& m, Matrix<double> x
 	out << "<UnstructuredGrid>\n";
 	out << "\t<Piece NumberOfPoints=\"" << m.gnpoin() << "\" NumberOfCells=\"" << m.gnelem() << "\">\n";
 
-	//enter point scalar data
-	out << "\t\t<CellData Scalars=\""<<scaname[0]<< "\" Vectors=\"" << vecname << "\">\n";
+	//out << "\t\t<CellData Scalars=\""<<scaname[0]<< "\" Vectors=\"" << vecname << "\">\n";
+	
+	if(x.msize()>0 || y.msize()>0) {
+		out << "\t\t<CellData ";
+		if(x.msize() > 0)
+			out << "Scalars=\"" << scaname[0] << "\" ";
+		if(y.msize() > 0)
+			out << "Vectors=\"" << vecname << "\"";
+		out << ">\n";
+	}
+	
+	//enter cell scalar data if available
+	if(x.msize() > 0) {
+		//cout << "aoutput: Writing scalars..\n";
+		for(int in = 0; in < nscalars; in++)
+		{
+			out << "\t\t\t<DataArray type=\"Float64\" Name=\"" << scaname[in] << "\" Format=\"ascii\">\n";
+			for(int i = 0; i < m.gnelem(); i++)
+				out << "\t\t\t\t" << x.get(i,in) << '\n';
+			out << "\t\t\t</DataArray>\n";
+		}
+		//cout << "aoutput: Scalars written.\n";
+	}
 
-	//cout << "aoutput: Writing scalars..\n";
-	for(int in = 0; in < nscalars; in++)
-	{
-		out << "\t\t\t<DataArray type=\"Float64\" Name=\"" << scaname[in] << "\" Format=\"ascii\">\n";
+	//enter vector cell data if available
+	if(y.msize() > 0) {
+		out << "\t\t\t<DataArray type=\"Float64\" Name=\"" << vecname << "\" NumberOfComponents=\"3\" Format=\"ascii\">\n";
 		for(int i = 0; i < m.gnelem(); i++)
-			out << "\t\t\t\t" << x(i,in) << '\n';
+		{
+			out << "\t\t\t\t";
+			for(int idim = 0; idim < y.cols(); idim++)
+				out << y.get(i,idim) << " ";
+			if(y.cols() == 2)
+				out << "0.0 ";
+			cout << '\n';
+		}
 		out << "\t\t\t</DataArray>\n";
 	}
-	//cout << "aoutput: Scalars written.\n";
-
-	//enter vector point data
-	out << "\t\t\t<DataArray type=\"Float64\" Name=\"" << vecname << "\" NumberOfComponents=\"3\" Format=\"ascii\">\n";
-	for(int i = 0; i < m.gnelem(); i++)
-		out << "\t\t\t\t" << y(i,0) << " " << y(i,1) << " " << 0.0 << '\n';
-	out << "\t\t\t</DataArray>\n";
-	out << "\t\t</CellData>\n";
+	if(x.msize() > 0 || y.msize() > 0)
+		out << "\t\t</CellData>\n";
 
 	//enter points
 	out << "\t\t<Points>\n";
 	out << "\t\t<DataArray type=\"Float64\" NumberOfComponents=\"3\" Format=\"ascii\">\n";
 	for(int i = 0; i < m.gnpoin(); i++)
-		out << "\t\t\t" << m.gcoords(i,0) << " " << m.gcoords(i,1) << " " << 0.0 << '\n';
+	{
+		out << "\t\t\t";
+		for(int idim = 0; idim < m.gndim(); idim++)
+			out << m.gcoords(i,idim) << " ";
+		if(m.gndim() == 2)
+			out << "0.0 ";
+		out << '\n';
+	}
 	out << "\t\t</DataArray>\n";
 	out << "\t\t</Points>\n";
 
 	//enter cells
 	out << "\t\t<Cells>\n";
 	out << "\t\t\t<DataArray type=\"UInt32\" Name=\"connectivity\" Format=\"ascii\">\n";
-	for(int i = 0; i < m.gnelem(); i++)
-		out << "\t\t\t\t" << m.ginpoel(i,0) << " " << m.ginpoel(i,1) << " " << m.ginpoel(i,2) << '\n';
+	for(int i = 0; i < m.gnelem(); i++) {
+		out << "\t\t\t\t"; 
+		for(int inode = 0; inode < m.gnnode(); inode++)	
+			out << m.ginpoel(i,inode) << " ";
+		out << '\n';
+	}
 	out << "\t\t\t</DataArray>\n";
 	out << "\t\t\t<DataArray type=\"UInt32\" Name=\"offsets\" Format=\"ascii\">\n";
 	for(int i = 0; i < m.gnelem(); i++)
-		out << "\t\t\t\t" << 3*(i+1) << '\n';
+		out << "\t\t\t\t" << m.gnnode()*(i+1) << '\n';
 	out << "\t\t\t</DataArray>\n";
 	out << "\t\t\t<DataArray type=\"Int32\" Name=\"types\" Format=\"ascii\">\n";
 	for(int i = 0; i < m.gnelem(); i++)
-		out << "\t\t\t\t" << celltype << '\n';
+		out << "\t\t\t\t" << elemcode << '\n';
 	out << "\t\t\t</DataArray>\n";
 	out << "\t\t</Cells>\n";
 
@@ -312,8 +363,7 @@ void writeScalarsVectorToVtu_CellData(string fname, UMesh2d& m, Matrix<double> x
 	cout << "Vtu file written.\n";
 }
 
-
-void writeScalarsVectorToVtu(string fname, UTriMesh m, Matrix<double> x, string scaname[], Matrix<double> y, string vecname)
+void writeScalarsVectorToVtu(string fname, UTriMesh& m, Matrix<double> x, string scaname[], Matrix<double> y, string vecname)
 {
 	cout << "aoutput: Writing vtu output...\n";
 	ofstream out(fname);

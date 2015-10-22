@@ -11,6 +11,8 @@
 #include "alinalg.hpp"
 #endif
 
+#define __AGEOMETRY_H 1
+
 using namespace std;
 using namespace amat;
 using namespace acfd;
@@ -406,21 +408,20 @@ double CSpline::getspline(int iface, int idim, double t)
 
 class BoundaryReconstruction2d
 {
-	UMesh2d* m;								// NOTE: make sure bpointsb has been computed!
-	vector<vector<int>> marks;				// to hold boundary markers of all parts
-	double cangle;							// minimum corner angle, above which an intersection is considered a corner
+	UMesh2d* m;								///< NOTE: make sure bpointsb has been computed!
+	vector<vector<int>> marks;				///< to hold boundary markers of all parts
+	double cangle;							///< minimum corner angle, above which an intersection is considered a corner
 	int nparts;
 	int nnparts;
-	//vector<CSpline> sparts;
 	CSpline* sparts;
 	vector<int> ncorners;
-	vector<bool> isClosed;					// contins true if a (parent) part is closed.
-	vector<bool> isSplitClosed;				// contains true if a split part is closed.
+	vector<bool> isClosed;					///< contins true if a (parent) part is closed.
+	vector<bool> isSplitClosed;				///< contains true if a split part is closed.
 	vector<int> startface;
-	Matrix<int> toRec;						// nparts x nface array that stores 1 if a face belongs to a part.
-	vector<vector<vector<int>>> corners;	// contains a list of point number and two containing bfaces for each corner point in each part.
-	vector<vector<int>> partfaces;			// stores a list of ordered faces for each part
-	Matrix<int> facepart;					// stores part no. and local face number in that part, for each boundary face
+	Matrix<int> toRec;						///< nparts x nface array that stores 1 if a face belongs to a part.
+	vector<vector<vector<int>>> corners;	///< contains a list of point number and two containing bfaces for each corner point in each part.
+	vector<vector<int>> partfaces;			///< stores a list of ordered faces for each part
+	Matrix<int> facepart;					///< stores part no. and local face number in that part, for each boundary face
 
 public:
 	void setup(UMesh2d* mesh, int num_parts, vector<vector<int>> boundary_markers, double angle_threshold);
@@ -468,7 +469,6 @@ void BoundaryReconstruction2d::setup(UMesh2d* mesh, int num_parts, vector<vector
 
 BoundaryReconstruction2d::~BoundaryReconstruction2d()
 {
-	//sparts.clear();
 	delete [] sparts;
 }
 

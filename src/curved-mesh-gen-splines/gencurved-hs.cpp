@@ -1,5 +1,5 @@
 #include <ageometry.hpp>
-#include "acurvedmeshgen-rbfs.hpp"
+#include "acurvedmeshgen-rbf-hs.hpp"
 
 using namespace std;
 using namespace amat;

@@ -224,32 +224,32 @@ public:
 	Matrix<double>* getcoords()
 	{ return &coords; }
 
-	int gesup(int i) { return esup.get(i); }
-	int gesup_p(int i) { return esup_p.get(i); }
-	int gpsup(int i) { return psup.get(i); }
-	int gpsup_p(int i) { return psup_p.get(i); }
-	int gesuel(int ielem, int jnode) { return esuel.get(ielem, jnode); }
+	int gesup(int i) const { return esup.get(i); }
+	int gesup_p(int i) const { return esup_p.get(i); }
+	int gpsup(int i) const { return psup.get(i); }
+	int gpsup_p(int i) const { return psup_p.get(i); }
+	int gesuel(int ielem, int jnode) const { return esuel.get(ielem, jnode); }
 	int gintfac(int face, int i) const { return intfac.get(face,i); }
-	int gintfacbtags(int face, int i) { return intfacbtags.get(face,i); }
-	int gbpoints(int poin, int i) { return bpoints.get(poin,i); }
-	int gbpointsb(int poin, int i) { return bpointsb.get(poin,i); }
-	int gbfacebp(int iface, int i) { return bfacebp.get(iface,i); }
-	int gbifmap(int intfacno) { return bifmap.get(intfacno); }
-	int gifbmap(int bfaceno) { return ifbmap.get(bfaceno); }
-	double gjacobians(int ielem) { return jacobians(ielem,0); }
+	int gintfacbtags(int face, int i) const { return intfacbtags.get(face,i); }
+	int gbpoints(int poin, int i) const { return bpoints.get(poin,i); }
+	int gbpointsb(int poin, int i) const { return bpointsb.get(poin,i); }
+	int gbfacebp(int iface, int i) const { return bfacebp.get(iface,i); }
+	int gbifmap(int intfacno) const { return bifmap.get(intfacno); }
+	int gifbmap(int bfaceno) const { return ifbmap.get(bfaceno); }
+	double gjacobians(int ielem) const { return jacobians.get(ielem,0); }
 
-	int gnpoin() { return npoin; }
-	int gnelem() { return nelem; }
-	int gnface() { return nface; }
-	int gnbface() { return nbface; }
-	int gnnode() { return nnode; }
-	int gndim() { return ndim; }
-	int gnaface() {return naface; }
-	int gnfael() { return nfael; }
-	int gnnofa() { return nnofa; }
-	int gnbtag() {return nbtag; }
-	int gndtag() { return ndtag; }
-	int gnbpoin() { return nbpoin; }
+	int gnpoin() const { return npoin; }
+	int gnelem() const { return nelem; }
+	int gnface() const { return nface; }
+	int gnbface() const { return nbface; }
+	int gnnode() const { return nnode; }
+	int gndim() const { return ndim; }
+	int gnaface() const {return naface; }
+	int gnfael() const { return nfael; }
+	int gnnofa() const { return nnofa; }
+	int gnbtag() const{ return nbtag; }
+	int gndtag() const { return ndtag; }
+	int gnbpoin() const { return nbpoin; }
 
 	void readDomn(string mfile)
 	{
@@ -1565,6 +1565,8 @@ public:
 			alloc_lambda = true;
 		}
 
+		cout << "UMesh2d: compute_metric_quantities(): Computing lambdas and areas" << endl;
+
 		// populate A^T*A vector for each element
 		for(int ielem = 0; ielem < nelem; ielem++)
 		{
@@ -1584,11 +1586,11 @@ public:
 			else if(nmtens == 4)
 				for(int k = 0; k < nmtens; k++)
 				{
-					lambda[ielem](k,0) = (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) 
+					lambda[ielem](k,0) = (coords(inpoel.get(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) 
 						+ (coords(inpoel(ielem,(k+1)%nnode),1) - coords(inpoel(ielem,k),1)) * (coords(inpoel(ielem,(k+1)%nnode),1) - coords(inpoel(ielem,k),1));
 					lambda[ielem](k,1) = (coords(inpoel(ielem,(k+1)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) 
 						+ (coords(inpoel(ielem,(k+1)%nnode),1) - coords(inpoel(ielem,k),1)) * (coords(inpoel(ielem,(k+3)%nnode),1) - coords(inpoel(ielem,k),1));
-					lambda[ielem](k,3) = (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) 
+					lambda[ielem](k,2) = (coords(inpoel.get(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) * (coords(inpoel(ielem,(k+3)%nnode),0) - coords(inpoel(ielem,k),0)) 
 						+ (coords(inpoel(ielem,(k+3)%nnode),1) - coords(inpoel(ielem,k),1)) * (coords(inpoel(ielem,(k+3)%nnode),1) - coords(inpoel(ielem,k),1));
 
 					alpha(ielem,k) = (coords(inpoel(ielem,(k+1)%nnode),0)-coords(inpoel(ielem,k),0))*(coords(inpoel(ielem,(k+3)%nnode),1)-coords(inpoel(ielem,k),1))
@@ -1648,6 +1650,7 @@ public:
 	/** Computes the skew-size metric, which is the product of the skew and size metrics. */
 	void linearmetric_skewsize(double w, Matrix<double>* ss)
 	{
+		cout << "UMesh2d: linearmetric_skewsize(): Computing the skew-size metric" << endl;
 		Matrix<double> size = *ss;
 		if(!alloc_lambda) {
 			cout << "UMesh2d: linearmetric_skew(): ! Metric quantities not computed!" << endl;
