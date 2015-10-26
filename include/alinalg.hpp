@@ -540,8 +540,10 @@ Matrix<double> sparseSOR(SpMatrix* A, Matrix<double> b, Matrix<double> xold, dou
 	return x;
 }
 
+/** Calculates solution of Ax=b where A is a SPD matrix in sparse format. The preconditioner is a diagonal matrix.
+	NOTE: The parallel version is actually slower, due to some reason.
+*/
 Matrix<double> sparseCG_d(SpMatrix* A, Matrix<double> b, Matrix<double> xold, double tol, int maxiter)
-/* Calculates solution of Ax=b where A is a SPD matrix in sparse format. The preconditioner is a diagonal matrix.*/
 {
 	cout << "sparseCG_d(): Solving " << A->rows() << "x" << A->cols() << " system by conjugate gradient method with diagonal preconditioner\n";
 
@@ -599,7 +601,7 @@ Matrix<double> sparseCG_d(SpMatrix* A, Matrix<double> b, Matrix<double> xold, do
 	do
 	{
 		if(steps % 10 == 0 || steps == 1)
-			cout << "sparseCG_d(): Iteration " << steps << ", relative residual = " << error << endl;
+			cout << "sparseCG_d(): Iteration " << steps << ", relative residual = " << error/normalizer << endl;
 		int i;
 
 		temp1 = rold.dot_product(zold);
@@ -617,7 +619,6 @@ Matrix<double> sparseCG_d(SpMatrix* A, Matrix<double> b, Matrix<double> xold, do
 			//cout << "Number of threads " << omp_get_num_threads();
 			x(i) = xold.get(i) + pold.get(i)*theta;
 			rold(i) = rold.get(i) - temp.get(i)*theta;
-			//diff(i) = x(i) - xold(i);
 		}
 		//cout << "x:\n"; x.mprint();
 		//cout << "r:\n"; r.mprint();
@@ -644,8 +645,6 @@ Matrix<double> sparseCG_d(SpMatrix* A, Matrix<double> b, Matrix<double> xold, do
 		//calculate ||b - A*x||
 		error = rold.l2norm();
 		//calculate ||x - xold||
-		//error = diff.l2norm();
-		//if(steps == 0) initres = error;
 
 		// set old variables
 		xold = x;
@@ -661,7 +660,7 @@ Matrix<double> sparseCG_d(SpMatrix* A, Matrix<double> b, Matrix<double> xold, do
 		steps++;
 	} while(error/normalizer > tol);
 
-	cout << "sparseCG_d(): Done. Number of iterations: " << steps << "; final residual " << error << ".\n";
+	cout << "sparseCG_d(): Done. Number of iterations: " << steps << "; final residual " << error/normalizer << ".\n";
 	return x;
 }
 

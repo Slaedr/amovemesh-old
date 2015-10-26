@@ -2,8 +2,8 @@
  ------------------------------------------------
 a small square for debugging purposes                                             
  ------------------------------------------------
- ndimn ntype
-     2     3
+ ndimn ntype nfael nnofa
+     2     3	3	 2
  nelem npoin nbface           time
      8     9      8     0.0000E+00
  intmat: nodal points corresponding to each element 

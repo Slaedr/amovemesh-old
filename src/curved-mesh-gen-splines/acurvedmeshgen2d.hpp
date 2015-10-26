@@ -17,6 +17,8 @@ using namespace std;
 using namespace amat;
 using namespace acfd;
 
+typedef RBFmove Meshmove;
+
 /** Class to generate curved mesh from a linear mesh using cubic spline reconstruction and one of the mesh movement techniques. */
 
 class Curvedmeshgen2d
@@ -30,6 +32,7 @@ class Curvedmeshgen2d
 	double maxiter;					///< Maximum number of iterations for linear solver used to compute spline coefficients.
 	int rbfchoice;					///< Parameters for mesh movement - the type of RBF to be used, if applicable
 	double supportradius;			///< Parameters for mesh movement - the support radius to be used, if applicable
+	int nummovesteps;				///< Number of steps in which to accomplish the total mesh movement.
 
 	int nbounpoin;					///< Number if boundary points.
 	int ninpoin;					///< Number of interior points.
@@ -37,31 +40,43 @@ class Curvedmeshgen2d
 	Matrix<double> boundisps;		///< Displacement at each boundary point of the quadratic mesh, computed using [disps](@ref disps).
 	Matrix<double> bounpoints;
 	Matrix<double> inpoints;
-	Matrix<int> bflag;
+	Matrix<int> bflagg;				///< This flag is true if the corresponding mesh node lies on a boundary.
+	Matrix<int> toRec;				///< This flag is true if a boundary face is to be reconstructed.
 
 public:
-	void setup(UMesh2d* mesh, UMesh2d* meshq, Meshmove* mmove, int num_parts, vector<vector<int>> boundarymarkers, double angle_threshold, double toler, double maxitera, int rbf_choice, double support_radius);
+	void setup(UMesh2d* mesh, UMesh2d* meshq, Meshmove* mmove, int num_parts, vector<vector<int>> boundarymarkers, double angle_threshold, double toler, double maxitera, int rbf_choice, double support_radius, int rbf_steps);
 
 	void compute_boundary_displacements();
 
 	void generate_curved_mesh();
 };
 
-Curvedmeshgen2d::setup(UMesh2d* mesh, UMesh2d* meshq, Meshmove* mmove, int num_parts, vector<vector<int>> boundarymarkers, double angle_threshold, double toler, double maxitera, int rbf_choice, double support_radius)
+void Curvedmeshgen2d::setup(UMesh2d* mesh, UMesh2d* meshq, Meshmove* mmove, int num_parts, vector<vector<int>> boundarymarkers, double angle_threshold, double toler, double maxitera, int rbf_choice, double support_radius, int rbf_steps)
 {
 	m = mesh;
 	mq = meshq;
 	mmv = mmove;
-	br.setup(m, int num_parts, vector<vector<int>> boundarymarkers, double angle_threshold);
+	br.setup(m, num_parts, boundarymarkers, angle_threshold);
 	tol = toler;
 	maxiter = maxitera;
 	rbfchoice = rbf_choice; supportradius = support_radius;
+	nummovesteps = rbf_steps;
 	disps.setup(m->gnface(),m->gndim());
-	bflag.setup(m->gnpoin(),1);
+	disps.zeros();
+	bflagg.setup(mq->gnpoin(),1);
+	
+	// demarcate which faces are to be reconstructed
+	toRec.setup(m->gnface(),1);
+	toRec.zeros();
+	for(int iface = 0; iface < m->gnface(); iface++)
+		for(int i = 0; i < boundarymarkers.size(); i++)
+			for(int j = 0; j < boundarymarkers[i].size(); j++)
+				if(m->gbface(iface,m->gnnofa()) == boundarymarkers[i][j])
+					toRec(iface) = 1;
 }
 
 /** Computes displacement of midpoint of each face. */
-Curvedmeshgen2d::compute_boundary_displacements()
+void Curvedmeshgen2d::compute_boundary_displacements()
 {
 	br.preprocess();
 	br.detect_corners();
@@ -82,8 +97,10 @@ Curvedmeshgen2d::compute_boundary_displacements()
 	double uh = 0.5;
 	for(int iface = 0; iface < m->gnface(); iface++)
 	{
-		for(int idim = 0; idim < gndim; idim++)
-			disps(iface,idim) = br.getcoords(iface,idim,uh) - facemidpoints.get(iface,idim);
+		// first check if iface was reconstructed!
+		if(toRec(iface))
+				for(int idim = 0; idim < m->gndim(); idim++)
+					disps(iface,idim) = br.getcoords(iface,idim,uh) - facemidpoints.get(iface,idim);
 	}
 
 	/// We do not need the linear mesh once we have the displacements of the faces' midpoints.
@@ -91,7 +108,7 @@ Curvedmeshgen2d::compute_boundary_displacements()
 
 /** Uses the previously computed displacements of the face midpoints to curve the mesh.
 */
-Curvedmeshgen2d::generate_curved_mesh()
+void Curvedmeshgen2d::generate_curved_mesh()
 {
 	/** 
 	Note that this function works with the straight quadratic mesh.
@@ -104,21 +121,24 @@ Curvedmeshgen2d::generate_curved_mesh()
 	for(int iface = 0; iface < mq->gnface(); iface++)
 	{
 		for(int idim = 0; idim < mq->gndim(); idim++)
-			allpoint_disps(m->gbface(iface,m->gnnofa()-1), idim) = disps(iface,idim);
+			allpoint_disps(mq->gbface(iface,mq->gnnofa()-1), idim) = disps(iface,idim);
 	}
 	
 	// first get bflag
+	bflagg.zeros();
 	for(int iface = 0; iface < mq->gnface(); iface++)
 	{
 		for(int inode = 0; inode < mq->gnnofa(); inode++)
-			bflag(mq->gbface(iface,inofa)) = 1;
+			bflagg(mq->gbface(iface,inode)) = 1;
 	}
 
 	nbounpoin = 0;
 	for(int i = 0; i < mq->gnpoin(); i++)
-		nbounpoin += bflag(i);
+		nbounpoin += bflagg(i);
 
 	ninpoin = mq->gnpoin()-nbounpoin;
+	cout << "Curvedmeshgen2d: generate_curved_mesh(): Number of boundary points in quadratic mesh = " << nbounpoin << endl;
+	cout << "Curvedmeshgen2d: generate_curved_mesh(): Number of interior points in quadratic mesh = " << ninpoin << endl;
 	bounpoints.setup(nbounpoin,mq->gndim());
 	boundisps.setup(nbounpoin,mq->gndim());
 	inpoints.setup(ninpoin,mq->gndim());
@@ -126,11 +146,12 @@ Curvedmeshgen2d::generate_curved_mesh()
 	///We divide mesh nodes into boundary points and interior points. We also populate boundisp so that it holds the displacement of each boundary point.
 	int k = 0, l = 0;
 	for(int ipoin = 0; ipoin < mq->gnpoin(); ipoin++)
-		if(bflag(ipoin))
+		if(bflagg(ipoin))
 		{
 			for(int idim = 0; idim < mq->gndim(); idim++){
 				bounpoints(k,idim) = mq->gcoords(ipoin,idim);
-				boundisp(k,idim) = allpoint_disps(ipoin,idim);
+				boundisps(k,idim) = allpoint_disps(ipoin,idim);
+			}
 			k++;
 		}
 		else
@@ -141,12 +162,34 @@ Curvedmeshgen2d::generate_curved_mesh()
 		}
 	
 	/// We now have all we need to call the mesh-movement functions and generate the curved mesh.
-	//TODO: Call RBF functions here
+	//Call RBF functions here
+
+	mmv->setup(&inpoints, &bounpoints, &boundisps, rbfchoice, supportradius, nummovesteps, tol, maxiter);
+	mmv->move();
+
+	bounpoints = mmv->getBoundaryPoints();
+	inpoints = mmv->getInteriorPoints();
 
 	/// Finally, we reassemble the coord array for the curved mesh using the mesh-mover's computed values.
-	//TODO: Get coord array of curved mesh
+	//Get coord array of curved mesh
+	Matrix<double> newcoords(mq->gnpoin(),mq->gndim());
+	k = 0; l = 0;
+	for(int ipoin = 0; ipoin < mq->gnpoin(); ipoin++)
+	{
+		if(bflagg(ipoin)) {
+			for(int idim = 0; idim < mq->gndim(); idim++)
+				newcoords(ipoin,idim) = bounpoints(k,idim);
+			k++;
+		}
+		else {
+			for(int idim = 0; idim < mq->gndim(); idim++)
+				newcoords(ipoin,idim) = inpoints(l,idim);
+			l++;
+		}
+	}
 
-	//TODO: Export mesh
+	// set it in mesh mq
+	mq->setcoords(&newcoords);
 }
 
 // ------------ end --------------------

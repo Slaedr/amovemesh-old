@@ -392,7 +392,7 @@ void CSpline::compute()
 
 double CSpline::getspline(int iface, int idim, double t)
 {
-	return scf[idim](seq_bface(iface),0) + scf[idim](seq_bface(iface),1)*t + scf[idim](seq_bface(iface),2)*t*t + scf[idim](seq_bface(iface),3)*t*t*t;
+	return scf[idim].get(seq_bface.get(iface),0) + scf[idim].get(seq_bface.get(iface),1)*t + scf[idim].get(seq_bface.get(iface),2)*t*t + scf[idim].get(seq_bface.get(iface),3)*t*t*t;
 }
 
 // --------------------- End of class CSpline --------------------------------------------------------------------------------------------//
@@ -429,7 +429,8 @@ public:
 	~BoundaryReconstruction2d();
 	
 	void preprocess();
-	/**< Determines whether each part is open or closed, and stores a starting bface number for each part */
+	/**< Determines whether each part is open or closed, and stores a starting bface number for each part 
+		NOTE: Make sure amesh2d::compute_boundary_points() has been executed.*/
 	
 	void detect_corners();
 	/**< Detect corners in each part based on dot-product of normals of adjacent faces becoming too small. */
@@ -443,6 +444,9 @@ public:
 	void compute_splines(double tol, int maxiter);
 	/**< Calls the compute() function of class CSpline to compute spline coefficients of all parts. */
 	
+	/**	Function to return coordinates of the curve.
+		NOTE: the argument iface must correspond to a face which was reconstructed!!
+	*/
 	double getcoords(int iface, int idim, double u);
 	
 	//void writeCoeffs(string fname);
@@ -485,7 +489,7 @@ void BoundaryReconstruction2d::preprocess()
 					toRec(ipart,iface) = 1;
 		}
 	}
-	
+	cout << "BoundaryReconstruction2d: preprocess(): toRec populated." << endl;
 	for(int ipart = 0; ipart < nparts; ipart++)
 	{
 		int startfac, nextface, curface, nextpoin;
@@ -534,8 +538,19 @@ void BoundaryReconstruction2d::preprocess()
 			startface[ipart] = curface;
 		}
 	}
+	cout << "BoundaryReconstruction2d: preprocess(): Done." << endl;
 }
 
+/**	Detects corner points by computing dot-products of normals of the two faces associated with a point and comparing it with cos(theta) for each point,
+	for a given angle theta.
+	Computes the corners data structure.
+	Each element of corners is a list of corner points structures for each corner point, so
+		corner[ipart][0] refers to the first corner point of part number ipart.
+	Each corner point structure contains the global point number of the corner and the two faces associated with that point. So,
+		corner[ipart][0][0] refers the global point number of the first corner of part ipart,
+		corner[ipart][0][1] contains the left face associated with the corner, and
+		corner[ipart][0][2] contians the right face associated with the corner.
+*/
 void BoundaryReconstruction2d::detect_corners()
 {
 	int p1, p2, p3;
@@ -628,7 +643,7 @@ void BoundaryReconstruction2d::read_corners(string cname)
 
 void BoundaryReconstruction2d::split_parts()
 {
-	nnparts = 0;
+	nnparts = 0;		// update to get total number of parts after all splits
 	cout << "BoundaryReconstruction2d: split_parts(): Splitting parts" << endl;
 	
 	// Split parts containing corners
@@ -665,9 +680,10 @@ void BoundaryReconstruction2d::split_parts()
 		if(isClosed[ipart])
 		{
 			int nsplits = ncorners[ipart];
+			cout << "BoundaryReconstruction2d: split_parts(): Part " << ipart << " is closed and contains " << nsplits << " corners." << endl;
 
-			//cout << "BoundaryReconstruction2d: split_parts(): Analysing closed part " << ipart << endl;
-			// change startface for this part to get a corner point face as startface
+			// Change startface for this part to get a corner point face as startface
+			// that is, set startface as the face to the right of the first corner point.
 			startface[ipart] = m->gbpointsb(corners[ipart][0][1],2);
 
 			vector<int> startfac(nsplits);
@@ -692,7 +708,8 @@ void BoundaryReconstruction2d::split_parts()
 				nextpoint = m->gbfacebp(curface,1);			// get boundary point number of next point (NOT global point number)
 				nextface = m->gbpointsb(nextpoint,2);
 
-				for(int i = nspl; i < nsplits; i++)
+				int i = 0;
+				for(i = 0; i < nsplits; i++)
 					if(nextface == startfac[i])				// if we've reached the beginning of the next part 
 					{	
 						// add the new part to partfces vector
@@ -709,8 +726,10 @@ void BoundaryReconstruction2d::split_parts()
 						break;
 					}
 
+				if(i == 0)		// if we've reached the first corner again, we're done
+					break;
 				// check if we've reached the end of this parent part, either by going beyond the set of markers for this part, or reaching the startface again
-				if(/*toRec(ipart,nextface) == 0 ||*/ nextface == startface[ipart]) 
+				/*if(nextface == startface[ipart]) 
 				{
 					// add last new part to partfaces
 					partfaces.push_back(facelist);
@@ -721,7 +740,7 @@ void BoundaryReconstruction2d::split_parts()
 					// exit from loop
 					cout << "BoundaryReconstruction2d: split_parts(): Part " << ipart << " split into " << nspl << " part(s) (out of " << nsplits << " part(s))."  << endl;
 					break;
-				}
+				}*/
 			}
 		}
 
@@ -792,6 +811,7 @@ void BoundaryReconstruction2d::compute_splines(double tol, int maxiter)
 		sparts[ipart].sequence();
 		sparts[ipart].compute();
 	}
+	cout << "BoundaryReconstruction2d: compute_splines(): Computed all spline pieces." << endl;
 }
 
 double BoundaryReconstruction2d::getcoords(int iface, int idim, double u)

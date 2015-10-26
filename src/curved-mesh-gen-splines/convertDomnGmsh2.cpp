@@ -8,8 +8,8 @@ int main()
 {
 	string dum, mfile, omfile;
 	
-	mfile = "feflo.domn.cylinder.coarse";
-	omfile = "cylinder-coarse.msh";
+	mfile = "../../input/smallmesh.domn";
+	omfile = "../../input/smallmesh.msh";
 
 	UMesh2d m;
 	m.readDomn(mfile);

@@ -37,7 +37,7 @@ TODO: (Not really needed) Make a Vector class, maybe as a sub-class of Matrix
 #ifdef _OPENMP
 	#ifndef OMP_H
 		#include <omp.h>
-		#define nthreads_m 8
+		#define nthreads_m 4
 	#endif
 #endif
 
@@ -234,6 +234,7 @@ public:
 	{
 #ifdef DEBUG
 		if(i>=nrows || j>=ncols) { std::cout << "Matrix: get(): Index beyond array size(s)\n"; return 0; }
+		if(i < 0 || j < 0) { std::cout << "Matrix: get(): Index less than 0!\n"; return 0; }
 #endif
 		//if(i < 0 || j < 0) {std::cout << "Matrix: get(): Negative index!\n"; return 0; }
 		if(storage == COLMAJOR)
@@ -576,11 +577,10 @@ public:
 		#endif
 		int i;
 		double ans = 0;
-		#pragma omp parallel for if(size >= 4) default(none) private(i) shared(elems,elemsA,size) reduction(+: ans) num_threads(nthreads_m)
+		//#pragma omp parallel for if(size >= 4) default(none) private(i) shared(elems,elemsA,size) reduction(+: ans) num_threads(nthreads_m)
 		for(i = 0; i < size; i++)
 		{
 			T temp = elems[i]*elemsA[i];
-			//#pragma omp critical (omp_dot)
 			ans += temp;
 		}
 		return ans;

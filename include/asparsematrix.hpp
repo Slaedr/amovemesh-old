@@ -585,6 +585,9 @@ public:
 		}
 	}
 
+	/** Returns product of sparse matrix with vector x and stores it in a.
+		NOTE: Parallel version does NOT work!!
+	*/
 	void multiply(Mat& x, Mat* a, char paralel = 'n')
 	{
 		//Mat a(x.rows(),x.cols());
@@ -604,7 +607,7 @@ public:
 			{
 				temp = val[i]*x.get(col_ind[i],k);
 				//(*a)(row_ind[i],k) += val[i]*x(col_ind[i],k);
-				#pragma omp critical (omp_sparse_multiply)
+				//#pragma omp critical (omp_sparse_multiply)
 				(*a)(row_ind[i],k) += temp;
 			}
 		}
@@ -623,7 +626,7 @@ public:
 		for(int k = 0; k < x->cols(); k++)		// for each column of x
 		{
 			int i;
-			#pragma omp parallel for default(none) private(i) shared(val,row_ind,col_ind,nnz,k,ans,x,y,p) num_threads(nthreads_sm)
+			//#pragma omp parallel for default(none) private(i) shared(val,row_ind,col_ind,nnz,k,ans,x,y,p) num_threads(nthreads_sm)
 			for(i = 0; i < nnz; i++)
 			{
 				if(col_ind[i] < p)

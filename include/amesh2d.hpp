@@ -8,11 +8,14 @@
 	Patrick M. Knupp, "Algebraic mesh quality metrics for unstructured initial meshes", Finite Elements in Analysis and Design, vol. 39, pp 217-241, 2003.
 
 	Changelog:
-	2015-10-21: Adding computation of mesh-quality metrics for quadrilateral elements
+	2015-10-21: Adding computation of mesh-quality metrics.
 */
 
 #ifndef _GLIBCXX_IOSTREAM
 #include <iostream>
+#endif
+#ifndef _GLIBCXX_IOMANIP
+#include <iomanip>
 #endif
 #ifndef _GLIBCXX_FSTREAM
 #include <fstream>
@@ -43,6 +46,10 @@
 #endif
 
 #define __AMESH2DGENERAL_H
+
+#ifndef MESHDATA_DOUBLE_PRECISION
+#define MESHDATA_DOUBLE_PRECISION 14
+#endif
 
 using namespace std;
 using namespace amat;
@@ -196,6 +203,7 @@ public:
 			delete [] lambda;
 	}
 
+	/** Functions to get mesh data. */
 	double gcoords(int pointno, int dim) const
 	{
 		return coords.get(pointno,dim);
@@ -208,18 +216,6 @@ public:
 	{
 		return bface.get(faceno, val);
 	}
-
-	void setcoords(Matrix<double>* c)
-	{ coords = *c; }
-
-	void setinpoel(Matrix<int>* inp)
-	{ inpoel = *inp; }
-
-	void setbface(Matrix<int>* bf)
-	{ bface = *bf; }
-
-	void modify_bface_marker(int iface, int pos, int number)
-	{ bface(iface, pos) = number; }
 
 	Matrix<double>* getcoords()
 	{ return &coords; }
@@ -250,13 +246,26 @@ public:
 	int gnbtag() const{ return nbtag; }
 	int gndtag() const { return ndtag; }
 	int gnbpoin() const { return nbpoin; }
+	
+	/** Functions to set some mesh data structures. */
+	void setcoords(Matrix<double>* c)
+	{ coords = *c; }
 
+	void setinpoel(Matrix<int>* inp)
+	{ inpoel = *inp; }
+
+	void setbface(Matrix<int>* bf)
+	{ bface = *bf; }
+
+	void modify_bface_marker(int iface, int pos, int number)
+	{ bface(iface, pos) = number; }
+
+
+	/** Reads Professor Luo's mesh file, which I call the 'domn' format.
+	   NOTE: Make sure nfael and nnofa are mentioned after ndim and nnode in the mesh file.
+	*/
 	void readDomn(string mfile)
 	{
-		/** Reads Professor Luo's mesh file, which I call the 'domn' format.
-		   NOTE: Make sure nfael and nnofa are mentioned after ndim and nnode in the mesh file.
-		*/
-
 		ifstream infile(mfile);
 		
 		// Do file handling here to populate npoin and nelem
@@ -661,7 +670,7 @@ public:
 	}
 
 	void compute_boundary_points()
-	/** Stores for each boundary point: the associated global point number and the two bfaces associated with it.
+	/** Stores (in array bpointsb) for each boundary point: the associated global point number and the two bfaces associated with it.
 	*/
 	{
 		cout << "UMesh2d: compute_boundary_points(): Calculating bpointsb structure"<< endl;
@@ -768,6 +777,7 @@ public:
 			face_type = 8;
 
 		ofstream outf(mfile);
+		outf << setprecision(MESHDATA_DOUBLE_PRECISION);
 		//cout << "nodes\n";
 		outf << "$MeshFormat\n2.2 0 8\n$EndMeshFormat\n";
 		outf << "$Nodes\n" << npoin << '\n';
@@ -844,14 +854,15 @@ public:
 		if(flagj == true) cout << "UMesh2d: detect_negative_jacobians(): There exist " << nneg << " element(s) with negative jacobian!!\n";
 	}
 
+	
+	/// Computes data structures for elements surrounding point (esup), points surrounding point (psup), elements surrounding elements (esuel),
+	/// elements surrounding faces along with points in faces (intfac), and also
+	/// a list of boundary points with correspong global point numbers and containing boundary faces (according to intfac) (bpoints).
+
+	/// NOTE: (1) Use only after setup()
+	///		  (2) Currently only works for linear mesh
 	void compute_topological()
 	{
-		/// Computes data structures for elements surrounding point (esup), points surrounding point (psup), elements surrounding elements (esuel),
-		/// elements surrounding faces along with points in faces (intfac), and also
-		/// a list of boundary points with correspong global point numbers and containing boundary faces (according to intfac) (bpoints).
-
-		/// NOTE: (1) Use only after setup()
-		///		  (2) Currently only works for linear mesh
 
 		cout << "UMesh2d: compute_topological(): Calculating and storing topological information...\n";
 		/// 1. Elements surrounding points
@@ -1315,6 +1326,9 @@ public:
 		}
 	}
 
+	/**	Adds high-order nodes to convert a linear mesh to a straight-faced quadratic mesh.
+		NOTE: Make sure to execute [compute_topological()](@ref compute_topological) before calling this function.
+	*/
 	UMesh2d convertLinearToQuadratic()
 	{
 		cout << "UMesh2d: convertLinearToQuadratic(): Producing quadratic mesh from linear mesh" << endl;
