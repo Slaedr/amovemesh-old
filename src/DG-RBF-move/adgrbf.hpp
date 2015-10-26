@@ -409,7 +409,7 @@ public:
 		/** Note that bflags contains as many rows as points in the mesh and contains 1 if the point is a boundary point and 0 otherwise.
 			boundary_angles has as many rows as points in the original mesh and contains (in-plane) rotation values for each point (in radians) (zero for interior points).
 			It is assumed that boundary_angles has rdim columns (1 for 2d, 3 for 3d).
-			rce contains coordinates of centre of rotation
+			rce contains coordinates of centre of rotation.
 		*/
 		
 		bmotion = boundary_angles;
