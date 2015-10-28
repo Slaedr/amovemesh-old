@@ -1,7 +1,8 @@
-// Funtionality for solving equations of linear elasticity on a straight-edged quadratic mesh using P2 Lagrange finite elements
-// (no non-homogeneous Neumann BCs)
-// June 12, 2015
-// Adtya Kashi
+/** Funtionality for solving equations of linear elasticity on a straight-edged quadratic mesh using P2 Lagrange finite elements
+* (no non-homogeneous Neumann BCs)
+* June 12, 2015
+* Adtya Kashi
+*/
 
 #ifndef _GLIBCXX_IOSTREAM
 #include <iostream>
@@ -37,6 +38,10 @@ using namespace acfd;
 
 namespace acfd {
 
+/**	Class to solve linear elasticity problem for a 2D mesh of triangular elements.
+	TODO: Use Umesh2d instead of UTriMeshCurved.
+	TODO: Use sparse matrix instead of regular matrix for K.
+*/
 class LinElastP2
 {
 	UTriMeshCurved* m;
@@ -222,6 +227,9 @@ public:
 		return K12;
 	}
 
+	/**	Assembles global stiffness matrix from element stiffness subroutines.
+		TODO: Use sparse matrix for K11, K12 and K22.
+	*/
 	void assembleStiffnessMatrix()
 	{
 		Matrix<double> K11, K22, K12;
