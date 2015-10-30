@@ -45,7 +45,11 @@ TODO: (Not really needed) Make a Vector class, maybe as a sub-class of Matrix
 
 // tolerance to check if something is zero
 #ifndef ZERO_TOL
-	#define ZERO_TOL 1e-14
+	#define ZERO_TOL 1e-15
+#endif
+
+#ifndef MATRIX_DOUBLE_PRECISION
+#define MATRIX_DOUBLE_PRECISION 14
 #endif
 
 //using namespace std;
@@ -236,7 +240,6 @@ public:
 		if(i>=nrows || j>=ncols) { std::cout << "Matrix: get(): Index beyond array size(s)\n"; return 0; }
 		if(i < 0 || j < 0) { std::cout << "Matrix: get(): Index less than 0!\n"; return 0; }
 #endif
-		//if(i < 0 || j < 0) {std::cout << "Matrix: get(): Negative index!\n"; return 0; }
 		if(storage == COLMAJOR)
 			return elems[j*nrows + i];
 		else
@@ -282,6 +285,7 @@ public:
 	void fprint(std::ofstream& outfile) const
 	{
 		//outfile << '\n';
+		outfile << std::setprecision(MATRIX_DOUBLE_PRECISION);
 		if(storage==COLMAJOR)
 			for(int i = 0; i < nrows; i++)
 			{

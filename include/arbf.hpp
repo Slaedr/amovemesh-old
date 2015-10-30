@@ -52,7 +52,7 @@ public:
 	///< boundary_motion is nbpoin-by-ndim array - containing displacements corresponding to boundary points.
 
 	void setup(Matrix<double>* int_points, Matrix<double>* boun_points, Matrix<double>* boundary_motion, int rbf_ch, double support_radius, int num_steps, double tolerance, int iter);
-	/// boundary_motion is nbpoin-by-ndim array - containing displacements corresponding to boundary points.
+	///< boundary_motion is nbpoin-by-ndim array - containing displacements corresponding to boundary points.
 
 	~RBFmove();
 
@@ -224,8 +224,6 @@ void RBFmove::assembleLHS()
 	double (RBFmove::*rbfunc)(double) = rbf;
 	int nbpoin = RBFmove::nbpoin;
 	int ndim = RBFmove::ndim;
-
-	//cout << (this->*rbfunc)(0.0) << endl;
 
 	// set the top nbpoin-by-nbpoin elements of A, ie, M_bb
 	//cout << "RBFmove:  assembleLHS(): assembling M_bb" << endl;

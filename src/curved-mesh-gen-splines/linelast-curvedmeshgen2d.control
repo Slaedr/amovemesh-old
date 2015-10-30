@@ -1,25 +1,25 @@
 -input-linear-mesh-filename
-../../input/mesh1yang.msh
+../../input/30P30N_luo_1st_tri.msh
 -input-quadratic-mesh-filename
-../../output/curved-mesh-gen-spline/mesh1yang_quadratic.msh
+../../output/curved-mesh-gen-spline/30P30N_luo_1st_tri_quadratic.msh
 -output-curved-mesh-filename
-../../output/curved-mesh-gen-spline/mesh1yang_curved.msh
+../../output/curved-mesh-gen-spline/30P30N_luo_1st_tri_curved_elast.msh
 -angle-threshold-for-corners
 40.0
--RBF-choice
-2
--Support-radius-for-RBF
-0.04
--Number-of-RBF-steps
-1
+-YoungsModulus
+1e9
+-PoissonsRatio
+0.4
 -Tolerance-for-RBF-move
 1e-6
 -Maximum-iterations
-1000
+10000
 -Number-of-spline-parts
-1
+3
 -Boundary-markers-in-each-spline-part.First-entry-for-each-part-is-number-of-markers
-1 1
+1 13
+1 12
+1 14
 
 30P30N_luo_1st_tri.msh
 3compairfoil_tri_quadratic.msh

@@ -12,3 +12,5 @@ quadratize:
 
 curve:
 	$(GPP) curvedmeshgen2d.cpp -o curve.out -std=c++11 -ggdb -I$(PRMM)/include -fopenmp
+curvee:
+	$(GPP) linelast-curvedmeshgen2d.cpp -o curvee.out -std=c++11 -ggdb -I$(PRMM)/include -fopenmp

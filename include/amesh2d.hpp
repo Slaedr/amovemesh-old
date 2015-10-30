@@ -29,6 +29,7 @@
 #ifndef _GLIBCXX_VECTOR
 #include <vector>
 #endif
+
 #ifdef _OPENMP
 #ifndef OMP_H
 #include <omp.h>
@@ -45,6 +46,8 @@
 #include <adatastructures.hpp>
 #endif
 
+#include <aconstants.h>
+
 #define __AMESH2DGENERAL_H
 
 #ifndef MESHDATA_DOUBLE_PRECISION
@@ -55,8 +58,6 @@ using namespace std;
 using namespace amat;
 
 namespace acfd {
-
-const double PI = 3.14159265358979323846;
 
 /** Class UMesh2d is a general mesh class for unstructured mesh (with 1 kind of element throughout - hybrid mesh is NOT supported) */
 class UMesh2d

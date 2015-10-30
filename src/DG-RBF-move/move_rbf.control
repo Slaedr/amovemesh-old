@@ -1,11 +1,11 @@
 -input-mesh
-qin-mesh.msh
+../../input/qin-mesh.msh
 -output-mesh
-rbf-qin.msh
+../../output/DG-RBF-move/rbf-qin.msh
 -negative-jacobian-file
 negative_jac.dat
 -rotation-angle
-113
+120
 -coordinates-of-centre-of-rotation
 0.0 0.0
 -number-of-boundary-markers-whose-faces-have-to-be-rotated
@@ -13,7 +13,7 @@ negative_jac.dat
 -boundary-markers-of-faces-to-be-rotated
 1
 support-radius
-17.0
+14.5
 -number-of-rbf-steps
 1
 -tolerance

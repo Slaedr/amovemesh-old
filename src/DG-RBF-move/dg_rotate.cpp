@@ -1,11 +1,10 @@
+#include <aconstants.h>
 #include "adgrbf.hpp"
-#include "arotation2dnew.hpp"
+#include <arotation2d.hpp>
 
 using namespace std;
 using namespace amat;
 using namespace acfd;
-
-const double pi = 3.14159265;
 
 int main()
 {
@@ -68,7 +67,7 @@ int main()
 	bool check = d.dg.detect_negative_jacobians();
 
 	m.compute_jacobians();
-	cout << "Checking jacobians\n";
+	cout << "Checking final mesh jacobians\n";
 	ofstream ojac(jacs);
 	m.detect_negative_jacobians(ojac);
 	ojac.close();

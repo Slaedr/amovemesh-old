@@ -6,7 +6,7 @@ using namespace amat;
 
 int main()
 {
-	MatrixCOO A(6,6);
+	MatrixCOO2<double> A(6,6);
 	Matrix<double> prod(6,1);
 	//cout << A.get(1,1) << endl;
 	//A.set(1,1,10.5);

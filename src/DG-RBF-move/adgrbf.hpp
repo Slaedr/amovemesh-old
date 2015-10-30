@@ -16,6 +16,10 @@ Oct 7, 2015: Added a similar class, DGRBFrotate, for rotation interpolation.
 #include <abowyerwatson.hpp>
 #endif
 
+#ifndef ZERO_TOL
+	#define ZERO_TOL 1e-14
+#endif
+
 using namespace std;
 using namespace amat;
 
@@ -44,8 +48,6 @@ class DGRBFmove
 	bool isallocalpha;
 	double (DGRBFmove::*rbf)(double);
 	double srad;			// support radius for RBFs
-
-	double tol;
 
 public:
 	Delaunay2D dg;
@@ -106,7 +108,6 @@ public:
 
 		srad = support_radius;
 
-		tol = 1e-20;			// very small number
 		//cout << "Test: " << rbf(0)<< ' ' << sqrt(0.0) << endl;
 	}
 
@@ -198,7 +199,7 @@ public:
 		Matrix<double> x(b.rows(), b.cols());
 		Matrix<double> Anum(A.rows(),A.cols());
 		ddet = det3(A);
-		if(dabs(ddet) < tol) cout << "! DGRBFmove: cramer3(): Matrix A is singular!!\n";
+		if(dabs(ddet) < ZERO_TOL) cout << "! DGRBFmove: cramer3(): Matrix A is singular!!\n";
 		for(int j = 0; j < b.cols(); j++)
 		{
 			for(int i = 0; i < b.rows(); i++)
@@ -396,7 +397,6 @@ class DGRBFrotate
 	double (DGRBFrotate::*rbf)(double);		///< Pointer to the specific RBF function to be used
 	double srad;							///< support radius for RBFs
 
-	double tol;								///< Tolerance for detecting singularity in Cramer solver
 	vector<double> rc;						///< coordinates of centre of rotation
 
 public:
@@ -476,7 +476,6 @@ public:
 
 		srad = support_radius;
 
-		tol = 1e-15;			// very small number
 	}
 
 	~DGRBFrotate()
@@ -569,7 +568,7 @@ public:
 		Matrix<double> x(b.rows(), b.cols());
 		Matrix<double> Anum(A.rows(),A.cols());
 		ddet = det3(A);
-		if(dabs(ddet) < tol) cout << "! DGRBFmove: cramer3(): Matrix A is singular!!\n";
+		if(dabs(ddet) < ZERO_TOL) cout << "! DGRBFmove: cramer3(): Matrix A is singular!!\n";
 		for(int j = 0; j < b.cols(); j++)
 		{
 			for(int i = 0; i < b.rows(); i++)
@@ -641,6 +640,7 @@ public:
 		// cycle over interior points
 		int contelem;
 		cout << "DGmove: movemesh(): Calculating containing elements for each interior point\n";
+		// This loop can be parallelized
 		for(int ipoin = 0; ipoin < ninpoin; ipoin++)
 		{
 			// first find containing DG element by "walking-through" the DG
@@ -663,6 +663,7 @@ public:
 		int elem; 
 		double* rr = new double[ndim];
 		double sum = 0;
+		// This loop can be parallelized
 		for(int ipoin = 0; ipoin < ninpoin; ipoin++)
 		{
 			// get the containing element
@@ -697,7 +698,7 @@ public:
 				//points(ipoin,0) = (points(ipoin,0) - rc[0])*cos(rr[0]) + (points(ipoin,1)-rc[1])*sin(rr[0]) + rc[0];
 				//points(ipoin,1) = (points(ipoin,1) - rc[1])*cos(rr[0]) - (points(ipoin,0)-rc[0])*sin(rr[0]) + rc[1];
 
-				// the ones below are derived by me
+				// the ones below are derived by me (just rotation in opposite direction to above)
 				points(ipoin,0) = (points(ipoin,0) - rc[0])*cos(rr[0]) - (points(ipoin,1)-rc[1])*sin(rr[0]) + rc[0];
 				points(ipoin,1) = (points(ipoin,1) - rc[1])*cos(rr[0]) + (points(ipoin,0)-rc[0])*sin(rr[0]) + rc[1];
 			}
@@ -707,7 +708,7 @@ public:
 			}
 		}
 		delete [] rr;
-
+		
 		// update coordinates in dgpoints using bmotionb
 		cout << "DGRBFrotate: movemesh(): Moving the Delaunay graph\n";
 		cout << "DGRBFrotate: movemesh(): Centre of rotation " << rc[0] << " " << rc[1] << endl;

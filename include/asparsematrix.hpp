@@ -18,8 +18,12 @@
 #include <fstream>
 #endif
 
-#ifndef _GLBCXX_CMATH
+#ifndef _GLIBCXX_CMATH
 #include <cmath>
+#endif
+
+#ifndef _GLIBCXX_VECTOR
+#include <vector>
 #endif
 
 #ifndef __AMATRIX2_H
@@ -33,6 +37,10 @@
 #endif
 #endif
 
+#ifndef ZERO_TOL
+#define ZERO_TOL 1e-15
+#endif
+
 namespace amat {
 
 typedef Matrix<double> Mat;
@@ -41,7 +49,6 @@ class SparseMatrix
 /* Abstract class for sparse storage of matrices */
 {
 protected:
-	double* val;
 	int nnz;
 	int nrows;
 	int ncols;
@@ -62,12 +69,13 @@ public:
 	virtual void multiply_parts(Mat* x, Mat* y, Mat* ans, int p) = 0;
 };
 
-class MatrixCOO : public SparseMatrix
-/*
+/**
  Implements sparse matrix storage in coordinate format. val contains non-zero values, col_ind and row_ind contain corresponding
  column and row indices; all three have length nnz after all values are stored.
 */
+class MatrixCOO : public SparseMatrix
 {
+	double* val;
 	int* col_ind;
 	int* row_ind;
 	bool sorted;		// a boolean flag that is true if row_ind is sorted in increasing order, and for each row index, col_ind is sorted in increasing order
@@ -222,7 +230,7 @@ public:
 
 			// now add the new element if it's non-zero
 			//std::cout << nnz << std::endl;
-			if(value != 0.0)
+			if(dabs(value) > ZERO_TOL)
 			{
 				int index = -1;
 				for(int i = 0; i < nnz; i++)
@@ -779,7 +787,7 @@ public:
 		return mat;
 	}
 
-	void combine_sparse_matrices(MatrixCOO& A11, MatrixCOO& A12, MatrixCOO& A21, MatrixCOO& A22)
+	void combine_sparse_matrices(const MatrixCOO& A11, const MatrixCOO& A12, const MatrixCOO& A21, const MatrixCOO& A22)
 	/* Combines A, B, C, and D (4 n-by-n matrices) into one 2n-by-2n matrix. CAUTION: All 4 input matrices must have same size! */
 	{
 		std::cout << "MatrixCOO: combine_sparse_matrices(): Combining matrices" << std::endl;
@@ -838,8 +846,467 @@ public:
 	}
 };
 
+#define INITIAL_ROW_SIZE 20
+
+/**
+ Implements sparse matrix storage in coordinate format, but with separate arrays for each row of the matrix.
+*/
+template<typename T>
+class MatrixCOO2
+{
+	int nrows;
+	int ncols;
+	std::vector<T>* val;
+	std::vector<int>* col_ind;	///< col_ind[k][j] contains the column number of val[k][j]
+	std::vector<int> rsize;				///< Number of non-zero elements in each row
+	int nnz;
+
+public:
+	MatrixCOO2() 
+	{ 
+		val = new std::vector<T>[2];  
+		col_ind = new std::vector<int>[2];
+	}
+
+	MatrixCOO2(int num_rows, int num_cols)
+	{
+		nrows = num_rows;
+		ncols = num_cols;
+		rsize.resize(nrows,0);
+		val = new std::vector<T>[nrows];
+		col_ind = new std::vector<int>[nrows];
+		for(int i = 0; i < nrows; i++)
+		{
+			val[i].reserve(INITIAL_ROW_SIZE);
+			col_ind[i].reserve(INITIAL_ROW_SIZE);
+		}
+	}
+
+	MatrixCOO2(const MatrixCOO2& other)
+	{
+		rsize = other.rsize;
+		nnz = other.nnz;
+		nrows = other.nrows; ncols = other.ncols;
+
+		val = new std::vector<T>[nrows];
+		col_ind = new std::vector<int>[nrows];
+
+		for(int i = 0; i < nrows; i++)
+			for(int j = 0; j < rsize[i]; j++)
+			{
+				val[i].push_back(other.val[i][j]);
+				col_ind[i].push_back(other.col_ind[i][j]);
+			}
+	}
+
+	MatrixCOO2& operator=(const MatrixCOO2& other)
+	{
+		rsize = other.rsize;
+		nnz = other.nnz;
+		nrows = other.nrows; ncols = other.ncols;
+
+		delete [] val;
+		delete [] col_ind;
+		val = new std::vector<T>[nrows];
+		col_ind = new std::vector<int>[nrows];
+
+		for(int i = 0; i < nrows; i++)
+			for(int j = 0; j < rsize[i]; j++)
+			{
+				val[i].push_back(other.val[i][j]);
+				col_ind[i].push_back(other.col_ind[i][j]);
+			}
+		return *this;
+	}
+
+	void setup(int num_rows, int num_cols)
+	{
+		delete [] val;
+		delete [] col_ind;
+
+		nrows = num_rows; ncols = num_cols;
+		rsize.resize(nrows,0);
+		val = new std::vector<T>[nrows];
+		col_ind = new std::vector<int>[nrows];
+		for(int i = 0; i < nrows; i++)
+		{
+			val[i].reserve(INITIAL_ROW_SIZE);
+			col_ind[i].reserve(INITIAL_ROW_SIZE);
+		}
+		nnz = 0;
+	}
+
+	~MatrixCOO2()
+	{
+		delete [] val;
+		delete [] col_ind;
+	}
+
+	int rows() { return nrows; }
+	int cols() {return ncols; }
+
+	void set(int x, int y, T value)
+	{
+		// search row x for the value
+		int pos = -1;
+		for(int j = 0; j < rsize[x]; j++)
+			if(col_ind[x][j] == y)
+				pos = j;
+		
+		if(pos == -1)
+		{
+			val[x].push_back(value);
+			col_ind[x].push_back(y);
+			rsize[x]++;
+			//nnz++;
+		}
+		else
+		{
+			val[x][pos] = value;
+		}
+	}
+	
+
+	T get(int x, int y)
+	{
+		T retval = 0;
+		for(int j = 0; j < rsize[x]; j++)
+			if(col_ind[x][j] == y)
+				retval = val[x][j];
+		return retval;
+	}
+
+	/// Combined getter/setter method.
+	/// Usage of this method might lead to zeros being stored.
+	T& operator()(int x, int y)
+	{
+		T* retval;
+		// search row x for the value
+		int pos = -1;
+		for(int j = 0; j < rsize[x]; j++)
+			if(col_ind[x][j] == y)
+				pos = j;
+		
+		if(pos == -1)
+		{
+			val[x].push_back(T(0));
+			col_ind[x].push_back(y);
+			rsize[x]++;
+			retval = &val[x][rsize[x]-1];
+			//nnz++;
+		}
+		else
+		{
+			retval = &val[x][pos];
+		}
+		return *retval;
+	}
+
+	/** Shrinks allocated memory of val and col_ind to fit the current number of non-zero elements.*/
+	void trim()
+	{
+		for(int i = 0; i < nrows; i++) {
+			val[i].shrink_to_fit();
+			col_ind[i].shrink_to_fit();
+		}
+	}
+
+
+	/*void print_data()
+	{
+		for(int i = 0; i < nnz; i++)
+			std::cout << val[i] << " ";
+		std::cout << std::endl;
+		for(int i = 0; i < nnz; i++)
+			std::cout << row_ind[i] << " ";
+		std::cout << std::endl;
+		for(int i = 0; i < nnz; i++)
+			std::cout << col_ind[i] << " ";
+		std::cout << std::endl;
+	}*/
+
+	void mprint()
+	{
+		std::cout << "\n";
+		for(int i = 0; i < nrows; i++)
+		{
+			for(int j = 0; j < ncols; j++)
+				std::cout << std::setw(WIDTH) << get(i,j);
+			std::cout << std::endl;
+		}
+	}
+
+	void fprint(std::ofstream& outfile)
+	{
+		//outfile << "\n";
+		for(int i = 0; i < nrows; i++)
+		{
+			for(int j = 0; j < ncols; j++)
+				outfile << " " << get(i,j);
+			outfile << std::endl;
+		}
+	}
+
+	/** Returns product of sparse matrix with std::vector x and stores it in a.
+		NOTE: Parallel version does NOT work!!
+	*/
+	void multiply(Mat& x, Mat* a, char paralel = 'n')
+	{
+		a->zeros();
+		//std::cout << "MatrixCOO: multiply(): Rows and columns of a: " << a->rows() << " " << a->cols() << std::endl;
+		double temp;
+		#ifdef _OPENMP
+		std::vector<T>* val = MatrixCOO2::val; std::vector<int>* col_ind = MatrixCOO2::col_ind;
+		#endif
+
+ 		std::vector<int>* rsize = &(this->rsize);
+
+		for(int k = 0; k < x.cols(); k++)		// for each column of x
+		{
+			int i;
+			#pragma omp parallel for default(none) private(i,temp) shared(val,col_ind,rsize,k,a,x) if(paralel=='y') //num_threads(nthreads_sm)
+			for(i = 0; i < nrows; i++)
+			{
+				for(int j = 0; j < (*rsize)[i]; j++)
+				{
+					temp = val[i][j]*x.get(col_ind[i][j],k);
+					(*a)(i,k) += temp;
+				}
+			}
+		}
+		//return a;
+	}
+
+	void multiply_parts(Mat* x, Mat* y, Mat* ans, int p)
+	/* Like the multiply() method, except the argument matrix is considered x for the first p-1 rows, 0 in the pth row and y for the remaining rows. */
+	{
+		ans->zeros();
+		#ifdef _OPENMP
+		std::vector<T>* val = MatrixCOO2::val; std::vector<int>* col_ind = MatrixCOO2::col_ind;
+		#endif
+		std::vector<int>* rsize = &this->rsize;
+
+		for(int k = 0; k < x->cols(); k++)		// for each column of x
+		{
+			int i;
+			//#pragma omp parallel for default(none) private(i) shared(val,row_ind,col_ind,nnz,k,ans,x,y,p) num_threads(nthreads_sm)
+			for(i = 0; i < nrows; i++)
+			{
+				for(int j = 0; j < (*rsize)[i]; j++)
+				{
+					if(col_ind[i][j] < p)
+						(*ans)(i,k) += val[i][j] * x->get(col_ind[i][j],k);
+					else if(col_ind[i][j] > p)
+						(*ans)(i,k) += val[i][j] * y->get(col_ind[i][j],k);
+				}
+			}
+		}
+	}
+
+	double getelem_multiply_parts(int rownum, Mat* x, Mat* y, int p, double num)
+	/* Returns dot product of rownum'th row of this matrix with a certain std::vector. This vector is composed of x for for the first p-1 elements and y for p+1'th element onwards with num as pth element.
+	NOTE: Make sure dimensions of x and y are same. */
+	{
+		double ans = 0;
+		//if(sorted == false) std::cout << "! MatrixCOO: multiply(): Matrix not sorted yet!\n";
+
+		for(int k = 0; k < x->cols(); k++)		// for each column of x
+		{
+			#ifdef _OPENMP
+			std::vector<T>* val = MatrixCOO2::val; std::vector<int>* col_ind = MatrixCOO2::col_ind;
+			#endif
+			std::vector<int>* rsize = &this->rsize;
+			int j;
+			#pragma omp parallel for default(none) private(j) shared(val,col_ind,rsize,k,rownum,p,x,y,num) reduction(+:ans) num_threads(nthreads_sm)
+			for(j = 0; j < (*rsize)[rownum]; j++)
+			{
+					if(col_ind[rownum][j] < p)
+						ans += val[rownum][j] * x->get(col_ind[rownum][j],k);
+					else if(col_ind[rownum][j] > p)
+						ans += val[rownum][j] * y->get(col_ind[rownum][j],k);
+					else
+						ans += val[rownum][j] * num;
+			}
+		}
+	}
+
+	/// D is returned as a column-std::vector containing diagonal elements of this sparse matrix.
+	void get_diagonal(Mat* D)
+	{
+		D->zeros();
+		for(int i = 0; i < nrows; i++)
+		{
+			for(int j = 0; j < rsize[i]; j++)	
+				if(i == col_ind[i][j])
+				{
+					//(*D)(row_ind[i]) = val[i];
+					D->set(i,0, val[i][j]);
+				}
+		}
+	}
+	
+	void get_lower_triangle(MatrixCOO2& L)
+	{
+		delete [] L.val;
+		delete [] L.col_ind;
+		L.val = new std::vector<T>[nrows];
+		L.col_ind = new std::vector<int>[nrows];
+		
+		L.nrows = nrows;
+		L.ncols = ncols;
+		L.rsize.resize(nrows,0);
+		
+		
+		for(int i = 0; i < nrows; i++)
+		{
+		
+			for(int j = 0; j < rsize[i]; j++)
+				if(i > col_ind[i][j])
+				{
+					L.val[i].push_back(val[i][j]);
+					L.col_ind[i].push_back(col_ind[i][j]);
+					L.rsize[i]++;
+				}
+		}
+		
+		// shrink to fit
+		/*if(L.nnz < nnz)
+		{
+			for(int i = nnz-1; i >= L.nnz; i--)
+			{
+				delete L.val+i;
+			}
+		}*/
+	}
+	
+	void get_upper_triangle(MatrixCOO2& L)
+	{
+		delete [] L.val;
+		delete [] L.col_ind;
+		L.val = new std::vector<T>[nrows];
+		L.col_ind = new std::vector<int>[nrows];
+		
+		L.nrows = nrows;
+		L.ncols = ncols;
+		L.rsize.resize(nrows,0);
+		
+		
+		for(int i = 0; i < nrows; i++)
+		{
+		
+			for(int j = 0; j < rsize[i]; j++)
+				if(i < col_ind[i][j])
+				{
+					L.val[i].push_back(val[i][j]);
+					L.col_ind[i].push_back(col_ind[i][j]);
+					L.rsize[i]++;
+				}
+		}
+		
+		// shrink to fit
+		/*if(L.nnz < nnz)
+		{
+			for(int i = nnz-1; i >= L.nnz; i--)
+			{
+				delete L.val+i;
+			}
+		}*/
+	}
+
+	MatrixCOO2<T> transpose()
+	{
+		std::cout << "MatrixCOO2: transpose(): Transposing matrix" << std::endl;
+		MatrixCOO2<T> mat;
+		delete [] mat.val;
+		delete [] mat.col_ind;
+		mat.val = new std::vector<T>[nrows];
+		mat.col_ind = new std::vector<int>[nrows];
+		mat.rsize.resize(nrows);
+		for(int i = 0; i < nrows; i++)
+			mat.rsize[i] = rsize[i];
+		mat.nrows = nrows; mat.ncols = ncols;
+
+		int i;
+
+		for(i = 0; i < nrows; i++)
+		{
+			for(int j = 0; j < rsize[i]; j++)
+			{
+				mat.val[col_ind[i][j]].push_back(val[i][j]);
+				mat.col_ind[col_ind[i][j]].push_back(i);
+			}
+		}
+
+		return mat;
+	}
+
+	/** Combines A, B, C, and D (4 n-by-n matrices) into one 2n-by-2n matrix. CAUTION: All 4 input matrices must have same size! */
+	void combine_sparse_matrices(const MatrixCOO2& A11, const MatrixCOO2& A12, const MatrixCOO2& A21, const MatrixCOO2& A22)
+	{
+		std::cout << "MatrixCOO: combine_sparse_matrices(): Combining matrices" << std::endl;
+		//std::cout << "MatrixCOO: combine_sparse_matrices(): A11 dimensions: " << A11.nrows << " " << A11.ncols << std::endl;
+
+		nrows = A11.nrows*2; ncols = A11.ncols*2;
+		delete [] val; delete [] col_ind;
+		val = new std::vector<T>[nrows];
+		col_ind = new std::vector<int>[nrows];
+
+		// reserve some amount of space
+		int maxrowsize = 6;
+		for(int ir = 0; ir < nrows; ir++)
+			if(A11.rsize[ir] > maxrowsize) maxrowsize = A11.rsize[ir];
+
+		for(int ir = 0; ir < nrows; ir++) {
+			val[ir].reserve(INITIAL_ROW_SIZE*2);
+			col_ind[ir].reserve(INITIAL_ROW_SIZE*2);
+		}
+
+		rsize.resize(nrows,0);
+
+		// start filling up the matrix
+
+		int i;
+		for(i = 0; i < A11.nrows; i++)
+		{
+			for(int j = 0; j < A11.rsize[i]; j++)
+			{
+				val[i].push_back(A11.val[i][j]);
+				col_ind[i].push_back(A11.col_ind[i][j]);
+			}
+		}
+
+		for(i = 0; i < A12.nrows; i++)
+		{
+			for(int j = 0; j < A12.rsize[i]; j++)
+			{
+				val[i].push_back(A12.val[i][j]);
+				col_ind[i].push_back(A12.col_ind[i][j]+nrows/2);
+			}
+		}
+
+		for(i = 0; i < A21.nrows; i++)
+		{
+			for(int j = 0; j < A21.rsize[i]; j++)
+			{
+				val[i+nrows/2].push_back(A21.val[i][j]);
+				col_ind[i+nrows/2].push_back(A21.col_ind[i][j]);
+			}
+		}
+
+		for(i = 0; i < A22.nrows; i++)
+		{
+			for(int j = 0; j < A22.rsize[i]; j++)
+			{
+				val[i+nrows/2].push_back(A22.val[i][j]);
+				col_ind[i+nrows/2].push_back(A22.col_ind[i][j]+nrows/2);
+			}
+		}
+	}
+};
+
 class MatrixCRS : public SparseMatrix
 {
+	double* val;
 	int* col_ind;
 	int* row_ptr;
 	int nnz;
@@ -923,5 +1390,10 @@ public:
 
 	}
 };
+
+#ifndef SPARSE_MATRIX_TO_USE
+typedef MatrixCOO2<double> SpMatrix;
+#define SPARSE_MATRIX_TO_USE 1
+#endif
 
 }

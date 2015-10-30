@@ -30,7 +30,9 @@ using namespace amat;
 namespace amat
 {
 
+#ifndef SPARSE_MATRIX_TO_USE
 typedef MatrixCOO SpMatrix;
+#endif
 
 /* Note: Cholesky algorithm only implemented for a row-major matrix */
 Matrix<double> cholesky(Matrix<double> A, Matrix<double> b)
